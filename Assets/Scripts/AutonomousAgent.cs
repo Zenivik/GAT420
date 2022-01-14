@@ -5,10 +5,12 @@ using UnityEngine;
 public class AutonomousAgent : Agent
 {
     [SerializeField] Perception perception;
+    [SerializeField] Perception flockPerception;
     [SerializeField] Steering steering;
+    [SerializeField] AutonomousAgentData agentData;
 
-    public float maxSpeed;
-    public float maxForce;
+    public float maxSpeed { get { return agentData.maxSpeed; } }
+    public float maxForce { get { return agentData.maxForce; } }
 
     public Vector3 velocity { get; set; } = Vector3.zero;
 
@@ -23,12 +25,22 @@ public class AutonomousAgent : Agent
             acceleration += steering.Wander(this);
         }
 
+        // seek and/or flee
         if (gameObjects.Length != 0)
         {
-            Debug.DrawLine(transform.position, gameObjects[0].transform.position);
+            //Debug.DrawLine(transform.position, gameObjects[0].transform.position);
 
-            Vector3 force = steering.Flee(this, gameObjects[0]);
-            acceleration += force;
+            acceleration += steering.Flee(this, gameObjects[0]) * agentData.fleeWeight;
+            acceleration += steering.Seek(this, gameObjects[0]) * agentData.seekWeight;
+        }
+
+        // flocking
+        gameObjects = flockPerception.GetGameObjects();
+        if (gameObjects.Length != 0)
+        {
+            acceleration += steering.Cohesion(this, gameObjects) * agentData.cohesionWeight;
+            acceleration += steering.Seperation(this, gameObjects, agentData.separationRadius) * agentData.separationWeight;
+            acceleration += steering.Alignment(this, gameObjects) * agentData.alignmentWeight;
         }
 
         velocity += acceleration * Time.deltaTime;
@@ -40,6 +52,6 @@ public class AutonomousAgent : Agent
             transform.rotation = Quaternion.LookRotation(velocity);
         }
 
-        transform.position = Utilities.Wrap(transform.position, new Vector3(-10, -10, -10), new Vector3(10, 10, 10));
+        transform.position = Utilities.Wrap(transform.position, new Vector3(-20, -20, -20), new Vector3(20, 20, 20));
     }
 }
